@@ -1,6 +1,153 @@
 ---
 
 plans:
+- name: cf-space-security
+  repo_paths:
+    cf-space-security:
+      repo: https://github.com/apoydence/cf-space-security
+  tasks:
+  - name: CI
+    output: binary
+    command: |
+      set -ex
+
+      export DESTINATION=/dev/shm
+      export OUTPUT=$(pwd)/binary
+
+      # Install go build tool
+      wget \
+        'https://dl.google.com/go/go1.10.2.linux-amd64.tar.gz' \
+        -O $DESTINATION/go1.10.2.linux-amd64.tar.gz \
+        --quiet
+
+      tar -C $DESTINATION -xzf $DESTINATION/go1.10.2.linux-amd64.tar.gz
+
+      export PATH=$PATH:$DESTINATION/go/bin
+
+      mkdir -p workspace
+      pushd workspace
+          export GOPATH=$(pwd)
+      popd
+
+      go version
+
+      mkdir -p $GOPATH/src/github.com/apoydence/
+      mv cf-space-security $GOPATH/src/github.com/apoydence/cf-space-security
+
+      pushd $GOPATH/src/github.com/apoydence/cf-space-security
+          go get -t -d ./...
+          go test --race ./...
+      popd
+
+      pushd $GOPATH/src/github.com/apoydence/cf-space-security/cmd/proxy
+        go build -o $OUTPUT/proxy
+      popd
+
+  - name: acceptance-tests
+    input: binary
+    parameters:
+      CF_SYSTEM_DOMAIN: ((CF_SYSTEM_DOMAIN))
+      CF_USERNAME: ((CF_USERNAME))
+      CF_PASSWORD: ((CF_PASSWORD))
+    command: |
+      set -ex
+
+      export DESTINATION=/dev/shm
+
+      # Install go build tool
+      wget \
+        'https://dl.google.com/go/go1.10.2.linux-amd64.tar.gz' \
+        -O $DESTINATION/go1.10.2.linux-amd64.tar.gz \
+        --quiet
+
+      tar -C $DESTINATION -xzf $DESTINATION/go1.10.2.linux-amd64.tar.gz
+
+      export PATH=$PATH:$DESTINATION/go/bin
+
+      mkdir -p workspace
+      pushd workspace
+          export GOPATH=$(pwd)
+      popd
+
+      go version
+
+      # Install CF CLI
+      wget \
+        'https://packages.cloudfoundry.org/stable?release=linux64-binary&source=github-rel' \
+        -O $DESTINATION/cf.tgz \
+        --quiet
+
+      tar -C $DESTINATION -xzf $DESTINATION/cf.tgz
+
+      # Find CF CLI and add to path
+      export PATH=$PATH:$DESTINATION/$(ls $DESTINATION/cf-cli* | head -n1)
+
+      cf version
+
+      # Hide these secrets.
+      set +x
+          cf login -a api.$CF_SYSTEM_DOMAIN -u $CF_USERNAME -p $CF_PASSWORD -o $CF_ORG -s $CF_SPACE
+      set -x
+
+      mkdir -p $GOPATH/src/github.com/test{,2}
+
+      cat <<EOF > $GOPATH/src/github.com/test/main.go
+      package main
+
+      import (
+        "log"
+        "net/http"
+        "os"
+      )
+
+      func main() {
+        resp, err := http.Get(os.Getenv("ADDR"))
+        if err != nil {
+          log.Fatal(err)
+        }
+
+        if resp.StatusCode != http.StatusOK {
+          log.Fatalf("%d", resp.StatusCode)
+        }
+
+        log.Print("success")
+      }
+
+      EOF
+
+      echo "Test that configured domains get authorization headers"
+      PORT=9999 DOMAINS=$CF_SYSTEM_DOMAIN CLIENT_ID=cf REFRESH_TOKEN=$(cat $HOME/.cf/config.json | jq -r .RefreshToken) timeout 10 ./binary/proxy &
+      ADDR=http://api.$CF_SYSTEM_DOMAIN HTTP_PROXY=localhost:9999 go run $GOPATH/src/github.com/test/main.go
+
+      cat <<EOF > $GOPATH/src/github.com/test2/main.go
+      package main
+
+      import (
+        "fmt"
+        "net/http"
+        "log"
+        "os"
+      )
+
+      func main() {
+        log.Printf("Listening on 127.0.0.1:%s", os.Getenv("PORT"))
+
+        log.Fatal(http.ListenAndServe(fmt.Sprintf("127.0.0.1:%s", os.Getenv("PORT")), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+          if _, ok := r.Header["Authorization"]; ok {
+            w.WriteHeader(400)
+          }
+        })))
+      }
+
+      EOF
+
+      echo "Test that non-configured domains do not get Authorization headers"
+      pushd $GOPATH/src/github.com/test2/
+        go build
+        PORT=10000 timeout 10 ./test2 &
+      popd
+      ADDR=http://localhost:10000 HTTP_PROXY=localhost:9999 go run $GOPATH/src/github.com/test/main.go
+
 - name: Triple-C Upgrades
   repo_paths:
     triple-c:
