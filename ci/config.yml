@@ -1,0 +1,84 @@
+---
+
+plans:
+- name: Triple-C Upgrades
+  repo_paths:
+    triple-c:
+      repo: https://github.com/apoydence/triple-c
+      branch: remotes/origin/master
+  tasks:
+  - name: build-triple-c
+    branch_guard: remotes/origin/master
+    output: binary
+    command: |
+      set -ex
+
+      export DESTINATION=/dev/shm
+
+      export OUTPUT=$(pwd)/binary
+
+      # Install go build tool
+      wget \
+        'https://dl.google.com/go/go1.10.2.linux-amd64.tar.gz' \
+        -O $DESTINATION/go1.10.2.linux-amd64.tar.gz \
+        --quiet
+
+      tar -C $DESTINATION -xzf $DESTINATION/go1.10.2.linux-amd64.tar.gz
+
+      export PATH=$PATH:$DESTINATION/go/bin
+
+      mkdir -p workspace
+      pushd workspace
+          export GOPATH=$(pwd)
+      popd
+
+      go version
+
+      mkdir -p $GOPATH/src/github.com/apoydence/
+      mv triple-c $GOPATH/src/github.com/apoydence/
+      pushd $GOPATH/src/github.com/apoydence/triple-c/cmd/triple-c
+          go get -d ./...
+          go build -o $OUTPUT/triple-c
+      popd
+
+  - name: upgrade-triple-c
+    input: binary
+    branch_guard: remotes/origin/master
+    parameters:
+      CF_SYSTEM_DOMAIN: ((CF_SYSTEM_DOMAIN))
+      CF_USERNAME: ((CF_USERNAME))
+      CF_PASSWORD: ((CF_PASSWORD))
+      CF_SPACE: ((CF_SPACE))
+      CF_ORG: ((CF_ORG))
+      CF_APP_NAME: ((CF_APP_NAME))
+    command: |
+      set -ex
+
+      export DESTINATION=/dev/shm
+
+      wget \
+        'https://packages.cloudfoundry.org/stable?release=linux64-binary&source=github-rel' \
+        -O $DESTINATION/cf.tgz \
+        --quiet
+
+      tar -C $DESTINATION -xzf $DESTINATION/cf.tgz
+
+      # Find CF CLI and add to path
+      export PATH=$PATH:$DESTINATION/$(ls $DESTINATION/cf-cli* | head -n1)
+
+      cf version
+
+      # Hide these secrets.
+      set +x
+          cf login -a api.$CF_SYSTEM_DOMAIN -u $CF_USERNAME -p $CF_PASSWORD -o $CF_ORG -s $CF_SPACE
+      set -x
+
+      # We're going to assume we already have this pushed and that we
+      # are simply updating the deployed bits. Therefore, this doesn't
+      # do any configuration.
+      if cf app $CF_APP_NAME &> /dev/null; then
+        pushd binary/
+          ls -alh ./*
+          cf push $CF_APP_NAME &> /dev/null
+        popd
+      fi
