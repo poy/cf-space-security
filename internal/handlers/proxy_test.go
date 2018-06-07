@@ -5,10 +5,14 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/apoydence/cf-space-security/internal/cache"
 	"github.com/apoydence/cf-space-security/internal/handlers"
+	"github.com/apoydence/cf-space-security/internal/metrics"
 	"github.com/apoydence/onpar"
 	. "github.com/apoydence/onpar/expect"
 	. "github.com/apoydence/onpar/matchers"
@@ -17,12 +21,15 @@ import (
 type TP struct {
 	*testing.T
 	spyTokenFetcher *spyTokenFetcher
-	server1         *httptest.Server
-	server2         *httptest.Server
-	headers1        []http.Header
-	headers2        []http.Header
-	recorder        *httptest.ResponseRecorder
-	p               http.Handler
+
+	server1   *httptest.Server
+	server2   *httptest.Server
+	return401 bool
+
+	headers1 []http.Header
+	headers2 []http.Header
+	recorder *httptest.ResponseRecorder
+	p        http.Handler
 }
 
 func TestProxy(t *testing.T) {
@@ -31,32 +38,69 @@ func TestProxy(t *testing.T) {
 	defer o.Run(t)
 
 	o.BeforeEach(func(t *testing.T) *TP {
+
 		tp := &TP{
 			T:               t,
 			spyTokenFetcher: newSpyTokenFetcher(),
 			recorder:        httptest.NewRecorder(),
 		}
-		server1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		tp.server1 = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			tp.headers1 = append(tp.headers1, r.Header)
+
+			if tp.return401 {
+				w.WriteHeader(401)
+			}
 		}))
-		server2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		tp.server2 = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			tp.headers2 = append(tp.headers2, r.Header)
 		}))
 
 		tp.spyTokenFetcher.token = "some-token"
-		tp.p = handlers.NewProxy([]string{server1.URL}, tp.spyTokenFetcher, log.New(ioutil.Discard, "", 0))
-		tp.server1 = server1
-		tp.server2 = server2
+		tp.p = handlers.NewProxy(
+			[]string{tp.server1.URL[7:]},
+			tp.spyTokenFetcher,
+			func(f func(r *http.Request) http.Handler) *cache.Cache {
+				return cache.New(1, time.Minute, f, newSpyMetrics(), log.New(ioutil.Discard, "", 0))
+			},
+			log.New(os.Stderr, "", 0),
+		)
 		return tp
 	})
 
 	o.Spec("adds authorization header to given domains", func(t *TP) {
 		req, err := http.NewRequest("GET", t.server1.URL, nil)
 		Expect(t, err).To(BeNil())
+		req.Host = "api." + t.server1.URL[7:]
 		t.p.ServeHTTP(t.recorder, req)
 
 		Expect(t, t.headers1).To(HaveLen(1))
 		Expect(t, t.headers1[0].Get("Authorization")).To(Equal("some-token"))
+	})
+
+	o.Spec("caches requests", func(t *TP) {
+		req, err := http.NewRequest("GET", t.server1.URL, nil)
+		Expect(t, err).To(BeNil())
+		req.Host = "api." + t.server1.URL[7:]
+		t.p.ServeHTTP(t.recorder, req)
+		t.p.ServeHTTP(t.recorder, req)
+
+		Expect(t, t.headers1).To(HaveLen(1))
+		Expect(t, t.headers1[0].Get("Authorization")).To(Equal("some-token"))
+		Expect(t, t.spyTokenFetcher.called).To(Equal(1))
+	})
+
+	o.Spec("requests new token on 401", func(t *TP) {
+		t.return401 = true
+		req, err := http.NewRequest("GET", t.server1.URL, nil)
+		Expect(t, err).To(BeNil())
+		req.Host = "api." + t.server1.URL[7:]
+		t.p.ServeHTTP(t.recorder, req)
+
+		Expect(t, t.headers1).To(HaveLen(1))
+		Expect(t, t.headers1[0].Get("Authorization")).To(Equal("some-token"))
+		Expect(t, t.spyTokenFetcher.called).To(Equal(2))
 	})
 
 	o.Spec("does not add authorization header to non-given domains", func(t *TP) {
@@ -101,4 +145,31 @@ func (s *spyTokenFetcher) Token() string {
 
 	s.called++
 	return s.token
+}
+
+type spyMetrics struct {
+	metrics.Metrics
+
+	mu sync.Mutex
+	m  map[string]uint64
+}
+
+func newSpyMetrics() *spyMetrics {
+	return &spyMetrics{
+		m: make(map[string]uint64),
+	}
+}
+
+func (s *spyMetrics) NewCounter(name string) func(uint64) {
+	return func(delta uint64) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		s.m[name] += delta
+	}
+}
+
+func (s *spyMetrics) GetDelta(name string) uint64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.m[name]
 }

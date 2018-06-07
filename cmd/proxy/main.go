@@ -1,12 +1,15 @@
 package main
 
 import (
+	"expvar"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/apoydence/cf-space-security/internal/cache"
 	"github.com/apoydence/cf-space-security/internal/handlers"
+	"github.com/apoydence/cf-space-security/internal/metrics"
 	"github.com/cloudfoundry-incubator/uaago"
 )
 
@@ -35,11 +38,25 @@ func main() {
 		return accessToken
 	})
 
+	m := metrics.New(expvar.NewMap("Proxy"))
+
+	cacheCreator := func(f func(*http.Request) http.Handler) *cache.Cache {
+		return cache.New(cfg.CacheSize, cfg.CacheExpiration, f, m, log)
+	}
+
 	proxy := handlers.NewProxy(
 		cfg.Domains,
 		tokenFetcher,
+		cacheCreator,
 		log,
 	)
+
+	go func() {
+		http.ListenAndServe(
+			fmt.Sprintf(":%d", cfg.HealthPort),
+			nil,
+		)
+	}()
 
 	log.Fatalf("failed to serve: %s",
 		http.ListenAndServe(

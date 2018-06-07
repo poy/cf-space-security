@@ -4,13 +4,17 @@ import (
 	"encoding/json"
 	"log"
 	"strings"
+	"time"
 
 	"code.cloudfoundry.org/go-envstruct"
 )
 
 type Config struct {
-	Port    int      `env:"PORT, required, report"`
-	Domains []string `env:"DOMAINS, required, report"`
+	Port            int           `env:"PORT, required, report"`
+	HealthPort      int           `env:"PROXY_HEALTH_PORT, report"`
+	CacheSize       int           `env:"CACHE_SIZE, report"`
+	CacheExpiration time.Duration `env:"CACHE_EXPIRATION, report"`
+	Domains         []string      `env:"DOMAINS, required, report"`
 
 	VcapApplication VcapApplication `env:"VCAP_APPLICATION, required"`
 
@@ -34,7 +38,10 @@ func (a *VcapApplication) UnmarshalEnv(data string) error {
 }
 
 func LoadConfig(log *log.Logger) Config {
-	cfg := Config{}
+	cfg := Config{
+		CacheSize:       100,
+		CacheExpiration: time.Minute,
+	}
 	if err := envstruct.Load(&cfg); err != nil {
 		log.Fatal(err)
 	}
