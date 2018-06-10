@@ -64,6 +64,7 @@ func main() {
 	}
 
 	proxy := handlers.NewProxy(
+		cfg.SkipSSLValidation,
 		cfg.Domains,
 		tokenFetcher,
 		cacheCreator,

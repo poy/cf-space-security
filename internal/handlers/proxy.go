@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"crypto/tls"
 	"io"
 	"log"
 	"net/http"
@@ -14,9 +15,10 @@ import (
 )
 
 type Proxy struct {
-	f TokenFetcher
-	m map[string]bool
-	c *cache.Cache
+	f            TokenFetcher
+	m            map[string]bool
+	c            *cache.Cache
+	proxyCreator func(*http.Request) http.Handler
 
 	mu    sync.Mutex
 	token string
@@ -34,6 +36,7 @@ func (f TokenFetcherFunc) Token() string {
 type CacheCreator (func(r *http.Request) http.Handler)
 
 func NewProxy(
+	skipSSLValidation bool,
 	domains []string,
 	f TokenFetcher,
 	cacheCreator func(func(r *http.Request) http.Handler) *cache.Cache,
@@ -50,7 +53,8 @@ func NewProxy(
 		token: f.Token(),
 	}
 
-	p.c = cacheCreator(p.createRevProxy)
+	p.c = cacheCreator(p.createRevProxy(skipSSLValidation, true))
+	p.proxyCreator = p.createRevProxy(skipSSLValidation, false)
 
 	return p
 }
@@ -72,7 +76,6 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			r.Header.Set("Authorization", p.getToken())
 
 			p.c.ServeHTTP(mw, r)
-			println(mw.statusCode)
 			if mw.statusCode == http.StatusUnauthorized {
 				p.token = ""
 				continue
@@ -81,7 +84,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		p.createRevProxy(r).ServeHTTP(mw, r)
+		p.proxyCreator(r).ServeHTTP(mw, r)
 		if mw.statusCode == http.StatusUnauthorized {
 			p.token = ""
 			continue
@@ -102,11 +105,23 @@ func (p *Proxy) getToken() string {
 	return p.token
 }
 
-func (p *Proxy) createRevProxy(r *http.Request) http.Handler {
-	u, _ := url.Parse(r.URL.String())
-	u.Path = ""
+func (p *Proxy) createRevProxy(skipSSLValidation, useHTTPS bool) func(*http.Request) http.Handler {
+	return func(r *http.Request) http.Handler {
+		u, _ := url.Parse(r.URL.String())
+		u.Path = ""
+		if u.Scheme == "http" && useHTTPS {
+			u.Scheme = "https"
+		}
 
-	return httputil.NewSingleHostReverseProxy(u)
+		rp := httputil.NewSingleHostReverseProxy(u)
+
+		rp.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: skipSSLValidation,
+			},
+		}
+		return rp
+	}
 }
 
 func (p *Proxy) removeSubdomain(host string) string {

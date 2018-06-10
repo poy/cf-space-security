@@ -45,7 +45,7 @@ func TestProxy(t *testing.T) {
 			recorder:        httptest.NewRecorder(),
 		}
 
-		tp.server1 = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tp.server1 = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			tp.headers1 = append(tp.headers1, r.Header)
 
 			if tp.return401 {
@@ -59,6 +59,7 @@ func TestProxy(t *testing.T) {
 
 		tp.spyTokenFetcher.token = "some-token"
 		tp.p = handlers.NewProxy(
+			true,
 			[]string{tp.server1.URL[7:]},
 			tp.spyTokenFetcher,
 			func(f func(r *http.Request) http.Handler) *cache.Cache {
