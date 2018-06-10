@@ -1,4 +1,4 @@
-package restager
+package capi
 
 import (
 	"bytes"
@@ -24,7 +24,7 @@ type TokenFetcher interface {
 	Token() string
 }
 
-func New(appID, apiAddr string, f TokenFetcher, d Doer, log *log.Logger) *Restager {
+func NewRestager(appID, apiAddr string, f TokenFetcher, d Doer, log *log.Logger) *Restager {
 	return &Restager{
 		f:       f,
 		d:       d,

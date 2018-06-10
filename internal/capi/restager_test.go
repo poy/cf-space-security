@@ -1,4 +1,4 @@
-package restager_test
+package capi_test
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/apoydence/cf-space-security/internal/restager"
+	"github.com/apoydence/cf-space-security/internal/capi"
 	"github.com/apoydence/onpar"
 	. "github.com/apoydence/onpar/expect"
 	. "github.com/apoydence/onpar/matchers"
@@ -17,7 +17,7 @@ type TR struct {
 	*testing.T
 	spyTokenFetcher *spyTokenFetcher
 	spyDoer         *spyDoer
-	r               *restager.Restager
+	r               *capi.Restager
 }
 
 func TestRestager(t *testing.T) {
@@ -32,7 +32,7 @@ func TestRestager(t *testing.T) {
 			T:               t,
 			spyTokenFetcher: spyTokenFetcher,
 			spyDoer:         spyDoer,
-			r:               restager.New("some-id", "https://some.com", spyTokenFetcher, spyDoer, log.New(ioutil.Discard, "", 0)),
+			r:               capi.NewRestager("some-id", "https://some.com", spyTokenFetcher, spyDoer, log.New(ioutil.Discard, "", 0)),
 		}
 	})
 

@@ -10,20 +10,17 @@ import (
 	"time"
 
 	"github.com/apoydence/cf-space-security/internal/cache"
+	"github.com/apoydence/cf-space-security/internal/capi"
 	"github.com/apoydence/cf-space-security/internal/handlers"
 	"github.com/apoydence/cf-space-security/internal/metrics"
-	"github.com/apoydence/cf-space-security/internal/restager"
 	"github.com/cloudfoundry-incubator/uaago"
 	jwt "github.com/dgrijalva/jwt-go"
 )
 
 func main() {
+	log := log.New(os.Stderr, "", log.LstdFlags)
 	log.Println("starting cf-space-security proxy...")
 	defer log.Println("closing cf-space-security proxy...")
-
-	log := log.New(os.Stderr, "", log.LstdFlags)
-	log.Println("Starting CF-Space-Security...")
-	defer log.Println("Closing CF-Space-Security...")
 
 	cfg := LoadConfig(log)
 
@@ -55,7 +52,7 @@ func main() {
 
 	go refreshTokenWatchdog(
 		cfg.RefreshToken,
-		restager.New(cfg.VcapApplication.ApplicationID, cfg.VcapApplication.CAPIAddr, tokenFetcher, httpClient, log),
+		capi.NewRestager(cfg.VcapApplication.ApplicationID, cfg.VcapApplication.CAPIAddr, tokenFetcher, httpClient, log),
 		log,
 	)
 
@@ -88,7 +85,7 @@ func main() {
 	)
 }
 
-func refreshTokenWatchdog(refToken string, r *restager.Restager, log *log.Logger) {
+func refreshTokenWatchdog(refToken string, r *capi.Restager, log *log.Logger) {
 	jwt.Parse(refToken, func(token *jwt.Token) (interface{}, error) {
 		claims := token.Claims.(jwt.MapClaims)
 
