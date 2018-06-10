@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"bytes"
 	"crypto/tls"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -60,6 +62,17 @@ func NewProxy(
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var body []byte
+
+	if r.Body != nil {
+		var err error
+		body, err = ioutil.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+
 	var recorder *httptest.ResponseRecorder
 	defer func() {
 		w.WriteHeader(recorder.Code)
@@ -67,15 +80,29 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	for i := 0; i < 2; i++ {
+		origHeaders := r.Header
+		r := *r
+		r.Body = ioutil.NopCloser(bytes.NewReader(body))
+
+		// Copy headers
+		r.Header = http.Header{}
+		for k, v := range origHeaders {
+			for _, vv := range v {
+				r.Header.Add(k, vv)
+			}
+		}
+
 		recorder = httptest.NewRecorder()
 		mw := &middleResponseWriter{
 			ResponseWriter: recorder,
 		}
 
 		if p.m[p.removeSubdomain(r.Host)] {
-			r.Header.Set("Authorization", p.getToken())
+			if _, ok := r.Header["Authorization"]; !ok {
+				r.Header.Set("Authorization", p.getToken())
+			}
 
-			p.c.ServeHTTP(mw, r)
+			p.c.ServeHTTP(mw, &r)
 			if mw.statusCode == http.StatusUnauthorized {
 				p.token = ""
 				continue
@@ -84,7 +111,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		p.proxyCreator(r).ServeHTTP(mw, r)
+		p.proxyCreator(&r).ServeHTTP(mw, &r)
 		if mw.statusCode == http.StatusUnauthorized {
 			p.token = ""
 			continue

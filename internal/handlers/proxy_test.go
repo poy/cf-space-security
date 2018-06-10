@@ -38,7 +38,6 @@ func TestProxy(t *testing.T) {
 	defer o.Run(t)
 
 	o.BeforeEach(func(t *testing.T) *TP {
-
 		tp := &TP{
 			T:               t,
 			spyTokenFetcher: newSpyTokenFetcher(),
@@ -78,6 +77,18 @@ func TestProxy(t *testing.T) {
 
 		Expect(t, t.headers1).To(HaveLen(1))
 		Expect(t, t.headers1[0].Get("Authorization")).To(Equal("some-token"))
+	})
+
+	o.Spec("does not overwrite authorization header", func(t *TP) {
+		req, err := http.NewRequest("GET", t.server1.URL, nil)
+		Expect(t, err).To(BeNil())
+		req.Header.Set("Authorization", "my-token")
+
+		req.Host = "api." + t.server1.URL[7:]
+		t.p.ServeHTTP(t.recorder, req)
+
+		Expect(t, t.headers1).To(HaveLen(1))
+		Expect(t, t.headers1[0].Get("Authorization")).To(Equal("my-token"))
 	})
 
 	o.Spec("caches requests", func(t *TP) {
