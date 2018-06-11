@@ -25,6 +25,7 @@ type Proxy struct {
 	mu    sync.Mutex
 	token string
 }
+
 type TokenFetcher interface {
 	Token() string
 }
