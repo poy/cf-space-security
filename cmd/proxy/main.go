@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	log := log.New(os.Stderr, "", log.LstdFlags)
+	log := log.New(os.Stderr, "[PROXY]", log.LstdFlags)
 	log.Println("starting cf-space-security proxy...")
 	defer log.Println("closing cf-space-security proxy...")
 

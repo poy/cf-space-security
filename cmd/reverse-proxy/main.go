@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	log := log.New(os.Stderr, "", log.LstdFlags)
+	log := log.New(os.Stderr, "[REVERSE-PROXY]", log.LstdFlags)
 	log.Println("starting cf-space-security reverse proxy...")
 	defer log.Println("closing cf-space-security reverse proxy...")
 
