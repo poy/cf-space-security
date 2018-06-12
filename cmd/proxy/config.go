@@ -14,7 +14,6 @@ type Config struct {
 	HealthPort      int           `env:"PROXY_HEALTH_PORT, report"`
 	CacheSize       int           `env:"CACHE_SIZE, report"`
 	CacheExpiration time.Duration `env:"CACHE_EXPIRATION, report"`
-	Domains         []string      `env:"DOMAINS, required, report"`
 
 	VcapApplication VcapApplication `env:"VCAP_APPLICATION, required"`
 

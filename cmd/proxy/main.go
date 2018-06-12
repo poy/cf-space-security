@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/apoydence/cf-space-security/internal/cache"
@@ -60,9 +62,12 @@ func main() {
 		return cache.New(cfg.CacheSize, cfg.CacheExpiration, f, m, log)
 	}
 
+	ds := domains(cfg, log)
+	log.Printf("Proxying for domains: %s", strings.Join(ds, ", "))
+
 	proxy := handlers.NewProxy(
 		cfg.SkipSSLValidation,
-		cfg.Domains,
+		ds,
 		tokenFetcher,
 		cacheCreator,
 		log,
@@ -83,6 +88,35 @@ func main() {
 			proxy,
 		),
 	)
+}
+
+func domains(cfg Config, log *log.Logger) []string {
+	var domains []string
+
+	appendDomain := func(addr string) {
+		u, err := url.Parse(addr)
+		if err != nil {
+			log.Fatalf("failed tp parse addr (%s): %s", cfg.VcapApplication.CAPIAddr, err)
+		}
+		domains = append(domains, removeSubdomain(u))
+	}
+
+	appendDomain(cfg.VcapApplication.CAPIAddr)
+
+	for _, URI := range cfg.VcapApplication.ApplicationURIs {
+		appendDomain(URI)
+	}
+
+	return domains
+}
+
+func removeSubdomain(u *url.URL) string {
+	domains := strings.SplitN(u.Host, ".", 2)
+	if len(domains) == 1 {
+		return u.Host
+	}
+
+	return domains[1]
 }
 
 func refreshTokenWatchdog(refToken string, r *capi.Restager, log *log.Logger) {
