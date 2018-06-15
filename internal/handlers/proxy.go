@@ -22,7 +22,7 @@ type Proxy struct {
 	c            *cache.Cache
 	proxyCreator func(*http.Request) http.Handler
 
-	mu    sync.Mutex
+	mu    sync.RWMutex
 	token string
 }
 
@@ -60,6 +60,12 @@ func NewProxy(
 	p.proxyCreator = p.createRevProxy(skipSSLValidation, false)
 
 	return p
+}
+
+func (p *Proxy) CurrentToken() string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.token
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {

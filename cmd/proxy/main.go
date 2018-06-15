@@ -73,6 +73,10 @@ func main() {
 		log,
 	)
 
+	http.HandleFunc("/tokens", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(fmt.Sprintf(`{"access_token":%q}`, proxy.CurrentToken())))
+	}))
+
 	go func() {
 		log.Printf("Listening on healthport %d", cfg.HealthPort)
 		http.ListenAndServe(

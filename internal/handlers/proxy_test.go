@@ -29,7 +29,7 @@ type TP struct {
 	headers1 []http.Header
 	headers2 []http.Header
 	recorder *httptest.ResponseRecorder
-	p        http.Handler
+	p        *handlers.Proxy
 }
 
 func TestProxy(t *testing.T) {
@@ -138,6 +138,10 @@ func TestProxy(t *testing.T) {
 			Expect(t, err).To(BeNil())
 			t.p.ServeHTTP(httptest.NewRecorder(), req)
 		}
+	})
+
+	o.Spec("it returns the current token", func(t *TP) {
+		Expect(t, t.p.CurrentToken()).To(Equal("some-token"))
 	})
 }
 
