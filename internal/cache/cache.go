@@ -111,6 +111,9 @@ func (c *Cache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rec := recorder.(*httptest.ResponseRecorder)
+	for k, v := range rec.Header() {
+		w.Header()[k] = v
+	}
 	w.WriteHeader(rec.Code)
 	io.Copy(w, bytes.NewReader(rec.Body.Bytes()))
 

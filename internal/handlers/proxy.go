@@ -82,6 +82,9 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var recorder *httptest.ResponseRecorder
 	defer func() {
+		for k, v := range recorder.Header() {
+			w.Header()[k] = v
+		}
 		w.WriteHeader(recorder.Code)
 		io.Copy(w, recorder.Body)
 	}()
@@ -154,6 +157,19 @@ func (p *Proxy) createRevProxy(skipSSLValidation, useHTTPS bool) func(*http.Requ
 				InsecureSkipVerify: skipSSLValidation,
 			},
 		}
+
+		rp.ModifyResponse = func(resp *http.Response) error {
+
+			if resp.StatusCode == http.StatusFound {
+				u, _ := url.Parse(resp.Header.Get("Location"))
+				if u != nil && p.m[p.removeSubdomain(u.Host)] {
+					resp.Header.Set("Location", strings.Replace(resp.Header.Get("Location"), "https", "http", 1))
+				}
+			}
+
+			return nil
+		}
+
 		return rp
 	}
 }
