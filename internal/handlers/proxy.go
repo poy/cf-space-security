@@ -20,6 +20,7 @@ type Proxy struct {
 	f            TokenFetcher
 	m            map[string]bool
 	c            *cache.Cache
+	a            TokenAnalyzer
 	proxyCreator func(*http.Request) http.Handler
 
 	mu    sync.RWMutex
@@ -36,6 +37,16 @@ func (f TokenFetcherFunc) Token() string {
 	return f()
 }
 
+type TokenAnalyzer interface {
+	Analyze(token string) (expired bool)
+}
+
+type TokenAnalyzerFunc func(token string) bool
+
+func (f TokenAnalyzerFunc) Analyze(token string) bool {
+	return f(token)
+}
+
 type CacheCreator (func(r *http.Request) http.Handler)
 
 func NewProxy(
@@ -43,6 +54,7 @@ func NewProxy(
 	domains []string,
 	f TokenFetcher,
 	cacheCreator func(func(r *http.Request) http.Handler) *cache.Cache,
+	a TokenAnalyzer,
 	log *log.Logger,
 ) *Proxy {
 	m := make(map[string]bool)
@@ -53,6 +65,7 @@ func NewProxy(
 	p := &Proxy{
 		f:     f,
 		m:     m,
+		a:     a,
 		token: f.Token(),
 	}
 
@@ -122,11 +135,6 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		p.proxyCreator(&r).ServeHTTP(mw, &r)
-		if mw.statusCode == http.StatusUnauthorized {
-			p.token = ""
-			continue
-		}
-
 		return
 	}
 }
@@ -136,6 +144,10 @@ func (p *Proxy) getToken() string {
 	defer p.mu.Unlock()
 
 	if p.token == "" {
+		p.token = p.f.Token()
+	}
+
+	if p.a.Analyze(p.token) {
 		p.token = p.f.Token()
 	}
 

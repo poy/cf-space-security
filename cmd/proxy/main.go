@@ -41,6 +41,22 @@ func main() {
 		return accessToken
 	})
 
+	tokenAnalyzer := handlers.TokenAnalyzerFunc(func(token string) bool {
+		parser := &jwt.Parser{}
+		c := jwt.MapClaims{}
+		_, _, err := parser.ParseUnverified(token[len("bearer "):], c)
+		if err != nil {
+			log.Fatalf("failed to parse JWT: %s", err)
+		}
+
+		expiresAtF, ok := c["exp"].(float64)
+		if !ok {
+			log.Fatalf("failed to parse JWT exp")
+		}
+		expiresAt := time.Unix(int64(expiresAtF), 0)
+		return expiresAt.Before(time.Now())
+	})
+
 	m := metrics.New(expvar.NewMap("Proxy"))
 
 	httpClient := &http.Client{
@@ -70,6 +86,7 @@ func main() {
 		ds,
 		tokenFetcher,
 		cacheCreator,
+		tokenAnalyzer,
 		log,
 	)
 

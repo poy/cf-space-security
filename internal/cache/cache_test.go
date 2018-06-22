@@ -61,6 +61,17 @@ func TestCache(t *testing.T) {
 		Expect(t, t.spyMetrics.GetDelta("CacheGetRequests")).To(Equal(uint64(2)))
 	})
 
+	o.Spec("it does not cache a non-2XX", func(t TC) {
+		t.spyHandler.fail = true
+		req, err := http.NewRequest("GET", "http://some.url", nil)
+		Expect(t, err).To(BeNil())
+
+		t.c.ServeHTTP(t.recorder, req)
+		t.c.ServeHTTP(t.recorder, req)
+
+		Expect(t, t.spyHandler.reqs).To(HaveLen(2))
+	})
+
 	o.Spec("accounts for query parameters", func(t TC) {
 		req, err := http.NewRequest("GET", "http://some.url?some=value", nil)
 		Expect(t, err).To(BeNil())
@@ -159,6 +170,7 @@ func TestCache(t *testing.T) {
 }
 
 type spyHandler struct {
+	fail bool
 	reqs []*http.Request
 }
 
@@ -168,6 +180,11 @@ func newSpyHandler() *spyHandler {
 
 func (s *spyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.reqs = append(s.reqs, r)
+	if s.fail {
+		w.WriteHeader(500)
+		return
+	}
+
 	w.WriteHeader(len(r.URL.String()))
 	w.Write([]byte(r.URL.String()))
 }

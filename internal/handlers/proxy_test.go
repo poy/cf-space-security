@@ -20,7 +20,8 @@ import (
 
 type TP struct {
 	*testing.T
-	spyTokenFetcher *spyTokenFetcher
+	spyTokenFetcher  *spyTokenFetcher
+	spyTokenAnalyzer *spyTokenAnalyzer
 
 	server1   *httptest.Server
 	server2   *httptest.Server
@@ -39,9 +40,10 @@ func TestProxy(t *testing.T) {
 
 	o.BeforeEach(func(t *testing.T) *TP {
 		tp := &TP{
-			T:               t,
-			spyTokenFetcher: newSpyTokenFetcher(),
-			recorder:        httptest.NewRecorder(),
+			T:                t,
+			spyTokenFetcher:  newSpyTokenFetcher(),
+			spyTokenAnalyzer: newSpyTokenAnalyzler(),
+			recorder:         httptest.NewRecorder(),
 		}
 
 		tp.server1 = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -64,6 +66,7 @@ func TestProxy(t *testing.T) {
 			func(f func(r *http.Request) http.Handler) *cache.Cache {
 				return cache.New(1, time.Minute, f, newSpyMetrics(), log.New(ioutil.Discard, "", 0))
 			},
+			tp.spyTokenAnalyzer,
 			log.New(os.Stderr, "", 0),
 		)
 		return tp
@@ -110,9 +113,22 @@ func TestProxy(t *testing.T) {
 		req.Host = "api." + t.server1.URL[7:]
 		t.p.ServeHTTP(t.recorder, req)
 
-		Expect(t, t.headers1).To(HaveLen(1))
+		Expect(t, t.headers1).To(HaveLen(2))
 		Expect(t, t.headers1[0].Get("Authorization")).To(Equal("some-token"))
 		Expect(t, t.spyTokenFetcher.called).To(Equal(2))
+	})
+
+	o.Spec("requests new token if it expires", func(t *TP) {
+		t.spyTokenAnalyzer.isExpired = true
+
+		req, err := http.NewRequest("GET", t.server1.URL, nil)
+		Expect(t, err).To(BeNil())
+		req.Host = "api." + t.server1.URL[7:]
+
+		t.p.ServeHTTP(t.recorder, req)
+		t.p.ServeHTTP(t.recorder, req)
+
+		Expect(t, t.spyTokenFetcher.called).To(BeAbove(1))
 	})
 
 	o.Spec("does not add authorization header to non-given domains", func(t *TP) {
@@ -188,4 +204,20 @@ func (s *spyMetrics) GetDelta(name string) uint64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.m[name]
+}
+
+type spyTokenAnalyzer struct {
+	token string
+
+	isExpired bool
+}
+
+func newSpyTokenAnalyzler() *spyTokenAnalyzer {
+	return &spyTokenAnalyzer{}
+}
+
+func (s *spyTokenAnalyzer) Analyze(token string) bool {
+	s.token = token
+
+	return s.isExpired
 }

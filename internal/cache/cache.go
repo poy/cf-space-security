@@ -24,6 +24,7 @@ type Cache struct {
 
 func New(size int, expire time.Duration, proxyCreator func(r *http.Request) http.Handler, m metrics.Metrics, log *log.Logger) *Cache {
 	cacheMiss := m.NewCounter("CacheMisses")
+	dontKeep := time.Duration(0)
 
 	var c gcache.Cache
 	if size > 0 {
@@ -47,6 +48,11 @@ func New(size int, expire time.Duration, proxyCreator func(r *http.Request) http
 
 				recorder := httptest.NewRecorder()
 				proxyCreator(r).ServeHTTP(recorder, r)
+
+				if recorder.Code >= 400 {
+					return recorder, &dontKeep, nil
+				}
+
 				return recorder, &expire, nil
 			}).
 			Build()
