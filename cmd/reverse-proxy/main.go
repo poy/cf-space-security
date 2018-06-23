@@ -33,12 +33,17 @@ func main() {
 	}
 
 	revProxy := handlers.NewReverseProxy(httputil.NewSingleHostReverseProxy(u), validator)
+	controller := handlers.NewController(
+		cfg.OpenEndpoints,
+		httputil.NewSingleHostReverseProxy(u),
+		revProxy,
+	)
 
 	log.Printf("Listening on %d", cfg.Port)
 	log.Fatalf("failed to serve: %s",
 		http.ListenAndServe(
 			fmt.Sprintf(":%d", cfg.Port),
-			revProxy,
+			controller,
 		),
 	)
 }

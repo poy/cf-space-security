@@ -8,8 +8,12 @@ import (
 )
 
 type Config struct {
-	Port            int             `env:"PORT, required, report"`
-	BackendPort     int             `env:"BACKEND_PORT, required, report"`
+	Port        int `env:"PORT, required, report"`
+	BackendPort int `env:"BACKEND_PORT, required, report"`
+
+	// Whitelist of endpoints that auth is not required.
+	OpenEndpoints []string `env:"OPEN_ENDPOINTS, report"`
+
 	VcapApplication VcapApplication `env:"VCAP_APPLICATION, required"`
 }
 
