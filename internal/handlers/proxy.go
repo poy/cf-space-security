@@ -82,6 +82,22 @@ func (p *Proxy) CurrentToken() string {
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Cache-Control") == "no-cache" {
+		p.setAuth(r)
+
+		mw := &middleResponseWriter{
+			ResponseWriter: w,
+		}
+
+		p.proxyCreator(r).ServeHTTP(mw, r)
+
+		if mw.statusCode == http.StatusUnauthorized {
+			p.clearToken()
+		}
+
+		return
+	}
+
 	var body []byte
 
 	if r.Body != nil {
@@ -121,13 +137,11 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if p.m[p.removeSubdomain(r.Host)] {
-			if _, ok := r.Header["Authorization"]; !ok {
-				r.Header.Set("Authorization", p.getToken())
-			}
+			p.setAuth(&r)
 
 			p.c.ServeHTTP(mw, &r)
 			if mw.statusCode == http.StatusUnauthorized {
-				p.token = ""
+				p.clearToken()
 				continue
 			}
 
@@ -136,6 +150,12 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		p.proxyCreator(&r).ServeHTTP(mw, &r)
 		return
+	}
+}
+
+func (p *Proxy) setAuth(r *http.Request) {
+	if _, ok := r.Header["Authorization"]; !ok {
+		r.Header.Set("Authorization", p.getToken())
 	}
 }
 
@@ -152,6 +172,12 @@ func (p *Proxy) getToken() string {
 	}
 
 	return p.token
+}
+
+func (p *Proxy) clearToken() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.token = ""
 }
 
 func (p *Proxy) createRevProxy(skipSSLValidation, useHTTPS bool) func(*http.Request) http.Handler {

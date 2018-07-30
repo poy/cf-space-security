@@ -106,6 +106,35 @@ func TestProxy(t *testing.T) {
 		Expect(t, t.spyTokenFetcher.called).To(Equal(1))
 	})
 
+	o.Spec("skips cache for Cache-Control no-cache", func(t *TP) {
+		req, err := http.NewRequest("GET", t.server1.URL, nil)
+		Expect(t, err).To(BeNil())
+		req.Host = "api." + t.server1.URL[7:]
+		req.Header.Set("Cache-Control", "no-cache")
+		t.p.ServeHTTP(t.recorder, req)
+		delete(req.Header, "Authorization")
+		t.p.ServeHTTP(t.recorder, req)
+
+		Expect(t, t.headers1).To(HaveLen(2))
+		Expect(t, t.headers1[0].Get("Authorization")).To(Equal("some-token"))
+		Expect(t, t.spyTokenFetcher.called).To(Equal(1))
+	})
+
+	o.Spec("requests new token on 401 with Cache-Control no-cache", func(t *TP) {
+		t.return401 = true
+		req, err := http.NewRequest("GET", t.server1.URL, nil)
+		Expect(t, err).To(BeNil())
+		req.Host = "api." + t.server1.URL[7:]
+		req.Header.Set("Cache-Control", "no-cache")
+		t.p.ServeHTTP(t.recorder, req)
+		delete(req.Header, "Authorization")
+		t.p.ServeHTTP(t.recorder, req)
+
+		Expect(t, t.headers1).To(HaveLen(2))
+		Expect(t, t.headers1[0].Get("Authorization")).To(Equal("some-token"))
+		Expect(t, t.spyTokenFetcher.called).To(Equal(2))
+	})
+
 	o.Spec("requests new token on 401", func(t *TP) {
 		t.return401 = true
 		req, err := http.NewRequest("GET", t.server1.URL, nil)
