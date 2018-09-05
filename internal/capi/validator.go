@@ -2,6 +2,8 @@ package capi
 
 import (
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 )
@@ -38,6 +40,11 @@ func (v *Validator) Validate(token string) bool {
 		v.log.Printf("failed making request to CAPI (%s): %s", v.capiAddr, err)
 		return false
 	}
+
+	defer func() {
+		io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
+	}()
 
 	return resp.StatusCode == http.StatusOK
 }
