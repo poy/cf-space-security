@@ -23,9 +23,10 @@ type TP struct {
 	spyTokenFetcher  *spyTokenFetcher
 	spyTokenAnalyzer *spyTokenAnalyzer
 
-	server1   *httptest.Server
-	server2   *httptest.Server
-	return401 bool
+	server1     *httptest.Server
+	server2     *httptest.Server
+	return401   bool
+	server1Data [][]byte
 
 	headers1 []http.Header
 	headers2 []http.Header
@@ -51,6 +52,13 @@ func TestProxy(t *testing.T) {
 
 			if tp.return401 {
 				w.WriteHeader(401)
+			}
+
+			f := w.(http.Flusher)
+			for len(tp.server1Data) > 0 {
+				w.Write(tp.server1Data[0])
+				tp.server1Data = tp.server1Data[1:]
+				f.Flush()
 			}
 		}))
 
@@ -167,6 +175,25 @@ func TestProxy(t *testing.T) {
 
 		Expect(t, t.headers2).To(HaveLen(1))
 		Expect(t, t.headers2[0].Get("Authorization")).To(Not(Equal("some-token")))
+	})
+
+	o.Spec("it flushes for each write to enable streaming", func(t *TP) {
+		t.server1Data = [][]byte{
+			[]byte("some-data"),
+			[]byte("some-other-data"),
+		}
+
+		req, err := http.NewRequest("GET", t.server1.URL, nil)
+		Expect(t, err).To(BeNil())
+		req.Host = "api." + t.server1.URL[7:]
+		req.Header.Set("Cache-Control", "no-cache")
+		t.p.ServeHTTP(t.recorder, req)
+		delete(req.Header, "Authorization")
+		t.p.ServeHTTP(t.recorder, req)
+
+		Expect(t, t.recorder.Body.String()).To(ContainSubstring("some-data"))
+		Expect(t, t.recorder.Body.String()).To(ContainSubstring("some-other-data"))
+		Expect(t, t.recorder.Flushed).To(BeTrue())
 	})
 
 	o.Spec("it survives the race detector", func(t *TP) {

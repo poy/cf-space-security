@@ -89,6 +89,10 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ResponseWriter: w,
 		}
 
+		if f, ok := w.(http.Flusher); ok {
+			mw.Flusher = f
+		}
+
 		p.proxyCreator(r).ServeHTTP(mw, r)
 
 		if mw.statusCode == http.StatusUnauthorized {
@@ -223,6 +227,7 @@ func (p *Proxy) removeSubdomain(host string) string {
 
 type middleResponseWriter struct {
 	http.ResponseWriter
+	http.Flusher
 
 	statusCode int
 }
@@ -230,4 +235,17 @@ type middleResponseWriter struct {
 func (w *middleResponseWriter) WriteHeader(code int) {
 	w.statusCode = code
 	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *middleResponseWriter) Write(data []byte) (int, error) {
+	n, err := w.ResponseWriter.Write(data)
+	if err != nil {
+		return n, err
+	}
+
+	if w.Flusher != nil {
+		w.Flush()
+	}
+
+	return n, nil
 }
