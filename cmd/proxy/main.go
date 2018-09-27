@@ -20,7 +20,7 @@ import (
 )
 
 func main() {
-	log := log.New(os.Stderr, "[PROXY]", log.LstdFlags)
+	log := log.New(os.Stderr, "[PROXY] ", log.LstdFlags)
 	log.Println("starting cf-space-security proxy...")
 	defer log.Println("closing cf-space-security proxy...")
 
@@ -117,7 +117,7 @@ func domains(cfg Config, log *log.Logger) []string {
 	appendDomain := func(addr string) {
 		u, err := url.Parse(addr)
 		if err != nil {
-			log.Fatalf("failed tp parse addr (%s): %s", cfg.VcapApplication.CAPIAddr, err)
+			log.Fatalf("failed tp parse addr (%s): %s", addr, err)
 		}
 		domains = append(domains, removeSubdomain(u))
 	}

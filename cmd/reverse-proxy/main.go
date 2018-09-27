@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	log := log.New(os.Stderr, "[REVERSE-PROXY]", log.LstdFlags)
+	log := log.New(os.Stderr, "[REVERSE-PROXY] ", log.LstdFlags)
 	log.Println("starting cf-space-security reverse proxy...")
 	defer log.Println("closing cf-space-security reverse proxy...")
 
@@ -32,7 +32,9 @@ func main() {
 		log.Fatalf("failed to parse backend addr: %s", err)
 	}
 
-	revProxy := handlers.NewReverseProxy(httputil.NewSingleHostReverseProxy(u), validator)
+	rp := httputil.NewSingleHostReverseProxy(u)
+	rp.ErrorLog = log
+	revProxy := handlers.NewReverseProxy(rp, validator)
 	controller := handlers.NewController(
 		cfg.OpenEndpoints,
 		httputil.NewSingleHostReverseProxy(u),

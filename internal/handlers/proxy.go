@@ -25,6 +25,7 @@ type Proxy struct {
 
 	mu    sync.RWMutex
 	token string
+	log   *log.Logger
 }
 
 type TokenFetcher interface {
@@ -67,6 +68,7 @@ func NewProxy(
 		m:     m,
 		a:     a,
 		token: f.Token(),
+		log:   log,
 	}
 
 	p.c = cacheCreator(p.createRevProxy(skipSSLValidation, true))
@@ -193,6 +195,7 @@ func (p *Proxy) createRevProxy(skipSSLValidation, useHTTPS bool) func(*http.Requ
 		}
 
 		rp := httputil.NewSingleHostReverseProxy(u)
+		rp.ErrorLog = p.log
 
 		rp.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
@@ -201,7 +204,6 @@ func (p *Proxy) createRevProxy(skipSSLValidation, useHTTPS bool) func(*http.Requ
 		}
 
 		rp.ModifyResponse = func(resp *http.Response) error {
-
 			if resp.StatusCode == http.StatusFound {
 				u, _ := url.Parse(resp.Header.Get("Location"))
 				if u != nil && p.m[p.removeSubdomain(u.Host)] {
