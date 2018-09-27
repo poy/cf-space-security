@@ -85,7 +85,9 @@ func (p *Proxy) CurrentToken() string {
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Cache-Control") == "no-cache" {
-		p.setAuth(r)
+		if p.m[p.removeSubdomain(r.Host)] {
+			p.setAuth(r)
+		}
 
 		mw := &middleResponseWriter{
 			ResponseWriter: w,

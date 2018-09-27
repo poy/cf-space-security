@@ -113,19 +113,27 @@ func main() {
 
 func domains(cfg Config, log *log.Logger) []string {
 	var domains []string
+	history := map[string]bool{}
 
 	appendDomain := func(addr string) {
 		u, err := url.Parse(addr)
 		if err != nil {
 			log.Fatalf("failed tp parse addr (%s): %s", addr, err)
 		}
-		domains = append(domains, removeSubdomain(u))
+
+		result := removeSubdomain(u)
+		if history[result] {
+			return
+		}
+		history[result] = true
+
+		domains = append(domains, result)
 	}
 
 	appendDomain(cfg.VcapApplication.CAPIAddr)
 
 	for _, URI := range cfg.VcapApplication.ApplicationURIs {
-		appendDomain(URI)
+		appendDomain("http://" + URI)
 	}
 
 	return domains

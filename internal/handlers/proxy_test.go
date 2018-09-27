@@ -128,6 +128,19 @@ func TestProxy(t *testing.T) {
 		Expect(t, t.spyTokenFetcher.called).To(Equal(1))
 	})
 
+	o.Spec("does not add token for outside domains with cache control", func(t *TP) {
+		req, err := http.NewRequest("GET", t.server2.URL, nil)
+		Expect(t, err).To(BeNil())
+		req.Host = "api." + t.server2.URL[7:]
+		req.Header.Set("Cache-Control", "no-cache")
+		t.p.ServeHTTP(t.recorder, req)
+		delete(req.Header, "Authorization")
+		t.p.ServeHTTP(t.recorder, req)
+
+		Expect(t, t.headers2).To(HaveLen(2))
+		Expect(t, t.headers2[0].Get("Authorization")).To(Equal(""))
+	})
+
 	o.Spec("requests new token on 401 with Cache-Control no-cache", func(t *TP) {
 		t.return401 = true
 		req, err := http.NewRequest("GET", t.server1.URL, nil)
