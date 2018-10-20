@@ -10,7 +10,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/apoydence/cf-space-security/internal/metrics"
+	"github.com/poy/cf-space-security/internal/metrics"
 	"github.com/bluele/gcache"
 )
 

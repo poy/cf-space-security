@@ -13,7 +13,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/apoydence/cf-space-security/internal/cache"
+	"github.com/poy/cf-space-security/internal/cache"
 )
 
 type Proxy struct {

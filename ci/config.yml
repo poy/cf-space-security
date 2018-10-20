@@ -4,7 +4,7 @@ plans:
 - name: cf-space-security
   repo_paths:
     cf-space-security:
-      repo: https://github.com/apoydence/cf-space-security
+      repo: https://github.com/poy/cf-space-security
   tasks:
   - name: CI
     output: binary
@@ -31,15 +31,15 @@ plans:
 
       go version
 
-      mkdir -p $GOPATH/src/github.com/apoydence/
-      mv cf-space-security $GOPATH/src/github.com/apoydence/cf-space-security
+      mkdir -p $GOPATH/src/github.com/poy/
+      mv cf-space-security $GOPATH/src/github.com/poy/cf-space-security
 
-      pushd $GOPATH/src/github.com/apoydence/cf-space-security
+      pushd $GOPATH/src/github.com/poy/cf-space-security
           go get -t -d ./...
           go test --race ./...
       popd
 
-      pushd $GOPATH/src/github.com/apoydence/cf-space-security/cmd/proxy
+      pushd $GOPATH/src/github.com/poy/cf-space-security/cmd/proxy
         go build -o $OUTPUT/proxy
       popd
 
@@ -151,7 +151,7 @@ plans:
 - name: Triple-C Upgrades
   repo_paths:
     triple-c:
-      repo: https://github.com/apoydence/triple-c
+      repo: https://github.com/poy/triple-c
       branch: remotes/origin/master
   tasks:
   - name: build-triple-c
@@ -181,9 +181,9 @@ plans:
 
       go version
 
-      mkdir -p $GOPATH/src/github.com/apoydence/
-      mv triple-c $GOPATH/src/github.com/apoydence/
-      pushd $GOPATH/src/github.com/apoydence/triple-c/cmd/triple-c
+      mkdir -p $GOPATH/src/github.com/poy/
+      mv triple-c $GOPATH/src/github.com/poy/
+      pushd $GOPATH/src/github.com/poy/triple-c/cmd/triple-c
           go get -d ./...
           go build -o $OUTPUT/triple-c
       popd

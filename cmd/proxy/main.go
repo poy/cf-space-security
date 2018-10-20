@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apoydence/cf-space-security/internal/cache"
-	"github.com/apoydence/cf-space-security/internal/capi"
-	"github.com/apoydence/cf-space-security/internal/handlers"
-	"github.com/apoydence/cf-space-security/internal/metrics"
+	"github.com/poy/cf-space-security/internal/cache"
+	"github.com/poy/cf-space-security/internal/capi"
+	"github.com/poy/cf-space-security/internal/handlers"
+	"github.com/poy/cf-space-security/internal/metrics"
 	"github.com/cloudfoundry-incubator/uaago"
 	jwt "github.com/dgrijalva/jwt-go"
 )

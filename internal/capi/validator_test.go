@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/apoydence/cf-space-security/internal/capi"
-	"github.com/apoydence/onpar"
-	. "github.com/apoydence/onpar/expect"
-	. "github.com/apoydence/onpar/matchers"
+	"github.com/poy/cf-space-security/internal/capi"
+	"github.com/poy/onpar"
+	. "github.com/poy/onpar/expect"
+	. "github.com/poy/onpar/matchers"
 )
 
 type TV struct {

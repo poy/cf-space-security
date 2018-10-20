@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/apoydence/cf-space-security/internal/cache"
-	"github.com/apoydence/cf-space-security/internal/handlers"
-	"github.com/apoydence/cf-space-security/internal/metrics"
-	"github.com/apoydence/onpar"
-	. "github.com/apoydence/onpar/expect"
-	. "github.com/apoydence/onpar/matchers"
+	"github.com/poy/cf-space-security/internal/cache"
+	"github.com/poy/cf-space-security/internal/handlers"
+	"github.com/poy/cf-space-security/internal/metrics"
+	"github.com/poy/onpar"
+	. "github.com/poy/onpar/expect"
+	. "github.com/poy/onpar/matchers"
 )
 
 type TP struct {

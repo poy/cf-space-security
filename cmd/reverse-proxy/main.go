@@ -9,8 +9,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/apoydence/cf-space-security/internal/capi"
-	"github.com/apoydence/cf-space-security/internal/handlers"
+	"github.com/poy/cf-space-security/internal/capi"
+	"github.com/poy/cf-space-security/internal/handlers"
 )
 
 func main() {
